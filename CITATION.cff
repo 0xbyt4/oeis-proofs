@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use these proofs or formalizations, please cite this repository."
+title: "oeis-proofs: proofs and Lean 4 formalizations of OEIS conjectures"
+type: software
+authors:
+  - name: "0xbyt4"
+license: Apache-2.0
+keywords:
+  - OEIS
+  - integer sequences
+  - Lean 4
+  - Mathlib
+  - formal proof
