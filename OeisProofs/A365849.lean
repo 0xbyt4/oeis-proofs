@@ -105,4 +105,91 @@ theorem modEq_one {m p q : ℕ} (hp : p.Prime) (hq : q.Prime) (hpq : p ≠ q)
     exact core hq hp hq4 (by rintro rfl; exact h21 rfl)
   · exact (not_dvd_right hN (hcop.mul_dvd_of_dvd_of_dvd hpm hqm) hT).elim
 
+/-! ## The sequence as a predicate -/
+
+/-- `t` is a term of A365849: `t` is a triangular number `m (m + 1) / 2` and `t = p * q`
+for distinct primes `p` and `q` that are both congruent to `3` modulo `4`. -/
+def IsTerm (t : ℕ) : Prop :=
+  (∃ m, m * (m + 1) = 2 * t) ∧
+    ∃ p q, p.Prime ∧ q.Prime ∧ p ≠ q ∧ p % 4 = 3 ∧ q % 4 = 3 ∧ t = p * q
+
+/-! ## Part 1: characterization -/
+
+/-- **Part 1.** The terms are exactly the numbers `r (2 r + 1)` with `r` and `2 r + 1` prime
+and `r ≡ 3 (mod 4)`. -/
+theorem isTerm_iff {t : ℕ} :
+    IsTerm t ↔ ∃ r, r.Prime ∧ r % 4 = 3 ∧ (2 * r + 1).Prime ∧ t = r * (2 * r + 1) := by
+  constructor
+  · rintro ⟨⟨m, hT⟩, p, q, hp, hq, hpq, hp4, hq4, rfl⟩
+    have hp3 : 3 ≤ p := by omega
+    have hq3 : 3 ≤ q := by omega
+    have hN : 9 ≤ p * q := by nlinarith
+    have hcop : Nat.Coprime p q := (Nat.coprime_primes hp hq).mpr hpq
+    have hpd : p ∣ m * (m + 1) := ⟨2 * q, by rw [hT]; ring⟩
+    have hqd : q ∣ m * (m + 1) := ⟨2 * p, by rw [hT]; ring⟩
+    rcases (Nat.Prime.dvd_mul hp).mp hpd with hpm | hpm <;>
+      rcases (Nat.Prime.dvd_mul hq).mp hqd with hqm | hqm
+    · exact (not_dvd_left hN (hcop.mul_dvd_of_dvd_of_dvd hpm hqm) hT).elim
+    · have hq' : q = 2 * p + 1 := split hp3 hq3 hp4 hq4 hpm hqm hT
+      subst hq'
+      exact ⟨p, hp, hp4, hq, rfl⟩
+    · have hp' : p = 2 * q + 1 := split hq3 hp3 hq4 hp4 hqm hpm (by rw [hT]; ring)
+      subst hp'
+      exact ⟨q, hq, hq4, hp, Nat.mul_comm _ _⟩
+    · exact (not_dvd_right hN (hcop.mul_dvd_of_dvd_of_dvd hpm hqm) hT).elim
+  · rintro ⟨r, hr, hr4, hq, rfl⟩
+    refine ⟨⟨2 * r, by ring⟩, r, 2 * r + 1, hr, hq, by omega, hr4, by omega, rfl⟩
+
+/-! ## Part 2: the congruence modulo 36 -/
+
+/-- **Part 2.** Every term other than `21` is congruent to `1` modulo `36`. -/
+theorem isTerm_mod_36 {t : ℕ} (ht : IsTerm t) (h21 : t ≠ 21) : t % 36 = 1 := by
+  obtain ⟨⟨m, hT⟩, p, q, hp, hq, hpq, hp4, hq4, rfl⟩ := ht
+  exact modEq_one hp hq hpq hp4 hq4 hT h21
+
+/-- `21 = 3 * 7` is a term. -/
+theorem isTerm_21 : IsTerm 21 :=
+  isTerm_iff.mpr ⟨3, by norm_num, by norm_num, by norm_num, by norm_num⟩
+
+/-- `21` is the least term. -/
+theorem le_of_isTerm {t : ℕ} (ht : IsTerm t) : 21 ≤ t := by
+  obtain ⟨r, -, hr4, -, rfl⟩ := isTerm_iff.mp ht
+  have hr : 3 ≤ r := by omega
+  nlinarith
+
+/-! ## Part 3: the modulus 36 is optimal -/
+
+/-- `253 = 11 * 23` is a term. -/
+theorem isTerm_253 : IsTerm 253 :=
+  isTerm_iff.mpr ⟨11, by norm_num, by norm_num, by norm_num, by norm_num⟩
+
+/-- `1081 = 23 * 47` is a term. -/
+theorem isTerm_1081 : IsTerm 1081 :=
+  isTerm_iff.mpr ⟨23, by norm_num, by norm_num, by norm_num, by norm_num⟩
+
+/-- `13861 = 83 * 167` is a term. -/
+theorem isTerm_13861 : IsTerm 13861 :=
+  isTerm_iff.mpr ⟨83, by norm_num, by norm_num, by norm_num, by norm_num⟩
+
+/-- **Part 3.** If all terms other than `21` have the same residue modulo `M`,
+then `M` divides `36`. -/
+theorem dvd_36_of_forall_modEq {M : ℕ}
+    (h : ∀ s t, IsTerm s → IsTerm t → s ≠ 21 → t ≠ 21 → s % M = t % M) : M ∣ 36 := by
+  have h1 : 253 ≡ 1081 [MOD M] := h _ _ isTerm_253 isTerm_1081 (by norm_num) (by norm_num)
+  have h2 : 253 ≡ 13861 [MOD M] := h _ _ isTerm_253 isTerm_13861 (by norm_num) (by norm_num)
+  have d1 : M ∣ 828 := (Nat.modEq_iff_dvd' (by norm_num)).mp h1
+  have d2 : M ∣ 13608 := (Nat.modEq_iff_dvd' (by norm_num)).mp h2
+  have hg : Nat.gcd 828 13608 = 36 := by norm_num
+  rw [← hg]
+  exact Nat.dvd_gcd d1 d2
+
+/-- Parts 2 and 3 together: all terms other than `21` have the same residue modulo `M`
+if and only if `M` divides `36`. -/
+theorem forall_modEq_iff_dvd_36 {M : ℕ} :
+    (∀ s t, IsTerm s → IsTerm t → s ≠ 21 → t ≠ 21 → s % M = t % M) ↔ M ∣ 36 := by
+  refine ⟨dvd_36_of_forall_modEq, fun hM s t hs ht hs21 ht21 => ?_⟩
+  have hs' : s ≡ 1 [MOD 36] := isTerm_mod_36 hs hs21
+  have ht' : t ≡ 1 [MOD 36] := isTerm_mod_36 ht ht21
+  exact (hs'.trans ht'.symm).of_dvd hM
+
 end OeisProofs.A365849
