@@ -5,6 +5,8 @@ type: software
 authors:
   - name: "0xbyt4"
 license: Apache-2.0
+version: 0.1.0
+repository-code: "https://github.com/0xbyt4/oeis-proofs"
 keywords:
   - OEIS
   - integer sequences
