@@ -22,6 +22,10 @@ Main results:
 * `sum_T_eq_A341309`: Statement 4, the row sums of A352269 give A341309.
 * `coeff_evenGF_of_le`: Statement 1 as an identity of power series over `ℚ`, for the
   partial sums over `h ≤ N` with `N ≥ n`.
+* `hasSum_evenGF`: Statement 1 as an infinite sum in `ℚ⟦X⟧` with the product topology.
+* `hasSum_A204217`: the OEIS generating function of A204217 sums to the power series
+  with coefficients `A204217 n`.
+* `mk_evenTotal_eq`: Statement 3 as an identity of generating functions.
 
 See `proofs/A352446.md` for the informal proof.
 -/
@@ -387,5 +391,75 @@ theorem coeff_evenGF_self (n : ℕ) : coeff n (evenGF n) = evenTotal n :=
 theorem coeff_evenGF_mono {n N M : ℕ} (hN : n ≤ N) (hM : N ≤ M) :
     coeff n (evenGF M) = coeff n (evenGF N) := by
   rw [coeff_evenGF_of_le hN, coeff_evenGF_of_le (hN.trans hM)]
+
+/-! ### The infinite sums in the product topology -/
+
+open scoped PowerSeries.WithPiTopology
+
+/-- The coefficient of `x^n` in `c x^e / (1 - x^m)`. -/
+theorem coeff_C_mul_X_pow_mul_inv (c : ℚ) {e m : ℕ} (hm : 1 ≤ m) (n : ℕ) :
+    coeff n (C c * X ^ e * (1 - X ^ m)⁻¹) = if e ≤ n ∧ m ∣ n - e then c else 0 := by
+  rw [mul_assoc, coeff_C_mul, coeff_X_pow_mul', inv_one_sub_X_pow hm]
+  by_cases h1 : e ≤ n
+  · by_cases h2 : m ∣ n - e <;> simp [h1, h2]
+  · simp [h1]
+
+/-- **Statement 1 as an infinite sum.** In `ℚ⟦X⟧` with the product topology,
+`sum_{h ≥ 1} 2 h x^(h (2 h + 1)) / (1 - x^(2 h))` (the summand with index `h` below is
+the term for `h + 1`) converges to the generating function of A352446. -/
+theorem hasSum_evenGF :
+    HasSum (fun h : ℕ => C (2 * (h + 1 : ℚ)) * X ^ ((h + 1) * (2 * (h + 1) + 1)) *
+      (1 - X ^ (2 * (h + 1)))⁻¹) (mk fun n => (evenTotal n : ℚ)) := by
+  rw [WithPiTopology.hasSum_iff_hasSum_coeff]
+  intro n
+  rw [coeff_mk, ← coeff_evenGF_self]
+  have hsum : coeff n (evenGF n) = ∑ h ∈ range n, coeff n (C (2 * (h + 1 : ℚ)) *
+      X ^ ((h + 1) * (2 * (h + 1) + 1)) * (1 - X ^ (2 * (h + 1)))⁻¹) := by
+    rw [evenGF, map_sum, ← Finset.Ico_add_one_right_eq_Icc, sum_Ico_eq_sum_range,
+      Nat.add_sub_cancel]
+    refine sum_congr rfl fun h _ => ?_
+    rw [add_comm 1 h]
+    push_cast
+    rfl
+  rw [hsum]
+  refine hasSum_sum_of_ne_finset_zero fun h hh => ?_
+  rw [mem_range, not_lt] at hh
+  rw [coeff_C_mul_X_pow_mul_inv _ (by omega)]
+  split_ifs with hc
+  · exfalso; nlinarith [hc.1]
+  · rfl
+
+/-- **A204217 as an infinite sum.** In `ℚ⟦X⟧` with the product topology,
+`sum_{k ≥ 1} k x^(k (k + 1) / 2) / (1 - x^k)` (the summand with index `k` below is the
+term for `k + 1`) converges to the power series with coefficients `A204217 n`. This is
+the generating function that defines A204217 in the OEIS. -/
+theorem hasSum_A204217 :
+    HasSum (fun k : ℕ => C (k + 1 : ℚ) * X ^ ((k + 1) * (k + 1 + 1) / 2) *
+      (1 - X ^ (k + 1))⁻¹) (mk fun n => (A204217 n : ℚ)) := by
+  rw [WithPiTopology.hasSum_iff_hasSum_coeff]
+  intro n
+  have hsum : (A204217 n : ℚ) = ∑ k ∈ range n, coeff n (C (k + 1 : ℚ) *
+      X ^ ((k + 1) * (k + 1 + 1) / 2) * (1 - X ^ (k + 1))⁻¹) := by
+    rw [A204217, Nat.cast_sum, sum_filter, ← Finset.Ico_add_one_right_eq_Icc,
+      sum_Ico_eq_sum_range, Nat.add_sub_cancel]
+    refine sum_congr rfl fun k _ => ?_
+    rw [coeff_C_mul_X_pow_mul_inv _ (by omega), add_comm 1 k]
+    push_cast
+    rfl
+  rw [coeff_mk, hsum]
+  refine hasSum_sum_of_ne_finset_zero fun k hk => ?_
+  rw [mem_range, not_lt] at hk
+  rw [coeff_C_mul_X_pow_mul_inv _ (by omega)]
+  have hT := two_mul_triangle (k + 1)
+  split_ifs with hc
+  · exfalso; nlinarith [hc.1]
+  · rfl
+
+/-- **Statement 3, power series form.** The generating function of A352446 is the
+generating function of A204217 minus that of A341309. -/
+theorem mk_evenTotal_eq :
+    (mk fun n => (evenTotal n : ℚ)) =
+      (mk fun n => (A204217 n : ℚ)) - mk fun n => (A341309 n : ℚ) := by
+  ext n; simp [A204217_eq_evenTotal_add_A341309]
 
 end OeisProofs.A352446
