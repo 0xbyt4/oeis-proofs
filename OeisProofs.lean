@@ -5,3 +5,4 @@ import OeisProofs.A343752
 import OeisProofs.A352446
 import OeisProofs.A365849
 import OeisProofs.A372966
+import OeisProofs.ColoredPartitions
