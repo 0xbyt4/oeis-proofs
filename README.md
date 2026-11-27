@@ -48,18 +48,18 @@ For every statement we do these steps:
 ## Formalization scope
 
 Every Lean file proves the statement that the OEIS marks as a conjecture,
-and the additional claims of the written proof. The table lists the
-remaining differences. Each proof file gives the details in its
+and most additional claims of the written proof. The table lists the claims
+that are proved on paper only. Each proof file gives the details in its
 "Formalization" section.
 
 | Result | Proved in Lean | Proved on paper only | Lean check against OEIS data |
 | --- | --- | --- | --- |
-| A306598 | The sign rule, the general theorem for strictly increasing positive sequences, and both divisibility remarks | None | First 8 terms, kernel-checked |
+| A306598 | The sign rule, the general theorem for strictly increasing positive sequences, and both divisibility remarks | The factorization of Remark 1 with the positivity of A071324(n), and the formula a(p) = 1 - p^2 of Remark 4 | First 8 terms, kernel-checked |
 | A343752 | The equivalence and the closed form | None | First 16 terms, kernel-checked |
 | A372966 | Divisibility, the congruence modulo 240, and a(2) = 241 | None | Uses Mathlib's `sigma` |
-| A365849 | The characterization of the terms, the congruence modulo 36, and the optimality of 36 | None | The terms 21, 253, 1081 and 13861 are proved to be terms; 21 is proved to be the least |
-| A352446, A341309, A352269 | All four statements. Statement 1 is proved for the coefficients of the partial sums of the series | The infinite sum of the series as one object; A204217 is used in coefficient form | First 12 terms of A352446 and A341309, kernel-checked |
-| A292042, A292043 | Both series formulas, in coefficient form | None | First 20 and 16 terms, kernel-checked |
+| A365849 | The characterization of the terms, the congruence modulo 36, and the optimality of 36 | The intermediate claim r = 11 (mod 12) has no separate theorem; it is a step inside the proof | The terms 21, 253, 1081 and 13861 are proved to be terms; 21 is proved to be the least |
+| A352446, A341309, A352269 | All four statements. The generating functions of A352446 and A204217 are proved as infinite sums of power series | The divisor formula of the Remark | First 12 terms of A352446 and A341309, kernel-checked |
+| A292042, A292043 | Both series formulas, in coefficient form and as infinite sums; the infinite product itself | None | First 20 and 16 terms, kernel-checked |
 | Colored partitions | The general theorem, as integer and as power-series identity, and the five corollaries | None | First 10 terms of each of the five sequences, kernel-checked |
 
 All theorems depend only on the standard axioms `propext`, `Classical.choice`
@@ -119,6 +119,8 @@ pre-commit install
 | 2026-11-27 | Automated comparison of each Lean statement with the written theorem and the OEIS wording | Main statements match; gaps recorded under "Formalization scope" |
 | 2026-11-27 | `lake build`, axiom audit of all theorems, and all scripts in `verify/` | All pass |
 | 2026-11-27 | Formalization of the claims that were proved on paper only | Done for A306598, A365849, A352446 and the colored partitions data |
+| 2026-11-27 | Automated comparison of the new Lean statements with the written claims | Statements match; four documentation overstatements found and corrected in the scope table |
+| 2026-11-27 | Infinite product and infinite sums for A292042 and A352446 as power-series statements | Done |
 
 ## How to cite
 
