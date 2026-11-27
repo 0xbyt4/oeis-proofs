@@ -1,2 +1,2 @@
--- Root module. Each formalized result lives in its own file under OeisProofs/
--- and is imported here, one `import OeisProofs.<Name>` line per result.
+-- Root module. Each formalized result lives in its own file under OeisProofs/.
+import OeisProofs.A306598
