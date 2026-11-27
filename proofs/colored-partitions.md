@@ -169,10 +169,16 @@ series over the complex numbers.
 example `2 * N 2 1 n = T 2 n - (if 2 | n then T 1 (n / 2) else 0)`.
 
 **Check against the data.** `N` is defined as the cardinality of a set and is
-not directly computable. The file defines a computable `Ncomp` and proves
-`N_eq_card : N m r n = Ncomp m r n`; evaluating `Ncomp` reproduces the first
-terms of the five OEIS sequences. That evaluation is a compiled computation,
-not a kernel-checked proof.
+not directly computable. The theorems `A392002_data`, `A389343_data`,
+`A390208_data`, `A390217_data` and `A387957_data` prove that
+`N m r n` for `n = 0, ..., 9` equals the first ten published terms of each of
+the five sequences. These are kernel-checked theorems about `N` itself; no
+`native_decide` is used. The proof does not evaluate `N` or `Ncomp` directly.
+It uses the five corollaries, which express `N` through `T`. The partition
+numbers `p(0), ..., p(9)` are the coefficients of the Euler product
+`prod_{i < 9} 1 / (1 - x^(i+1))` up to `x^9`, and the kernel computes them
+with `decide +kernel`. For `n < 10`, `T c n` is then the `c`-fold convolution
+of these numbers. Terms with `n >= 10` are not checked.
 
 The proofs depend only on the standard axioms `propext`, `Classical.choice`
 and `Quot.sound`.

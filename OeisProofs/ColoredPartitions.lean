@@ -60,15 +60,21 @@ of `n` with the coefficient of `x^n` in `prod_{c < m} G (z^c)`, where
 
 ## Numerical check
 
-`N_eq_card` proves `N m r n = Ncomp m r n`, where `Ncomp` is computable. Evaluating
-`Ncomp m r n` for `n = 0, ..., 9` with `#eval` (in a scratch file, not part of this file; this
-is a compiled evaluation, not a kernel-checked proof) gives the OEIS data:
+The theorems `A392002_data`, `A389343_data`, `A390208_data`, `A390217_data` and
+`A387957_data` prove, as kernel-checked theorems about `N` itself, that `N m r n` for
+`n = 0, ..., 9` is the OEIS data:
 
-* `Ncomp 2 1`: 0, 1, 2, 5, 9, 18, 31, 55, 90, 150 (A392002)
-* `Ncomp 3 0`: 1, 1, 3, 8, 17, 36, 75, 143, 270, 495 (A389343)
-* `Ncomp 3 1`: 0, 1, 3, 7, 17, 36, 73, 143, 270, 492 (A390208)
-* `Ncomp 4 0`: 1, 1, 4, 10, 28, 63, 146, 310, 651, 1295 (A390217)
-* `Ncomp 4 1`: 0, 1, 3, 10, 25, 63, 141, 310, 640, 1295 (A387957)
+* `N 2 1`: 0, 1, 2, 5, 9, 18, 31, 55, 90, 150 (A392002)
+* `N 3 0`: 1, 1, 3, 8, 17, 36, 75, 143, 270, 495 (A389343)
+* `N 3 1`: 0, 1, 3, 7, 17, 36, 73, 143, 270, 492 (A390208)
+* `N 4 0`: 1, 1, 4, 10, 28, 63, 146, 310, 651, 1295 (A390217)
+* `N 4 1`: 0, 1, 3, 10, 25, 63, 141, 310, 640, 1295 (A387957)
+
+The proofs do not evaluate `Ncomp` (the kernel cannot reduce it). They use the five
+corollaries above, which express `N` through `T`. The partition numbers `p(0), ..., p(9)` come
+from the Euler product of `P` truncated to nine factors, whose coefficients the kernel computes
+with `decide +kernel` (`pp_nine`). Then `T c n` for `n < 10` is the `c`-fold convolution of
+these numbers (`T_eq_Tv`). No `native_decide` is used.
 -/
 
 open Finset PowerSeries
@@ -708,5 +714,211 @@ theorem N_three_two (n : ℕ) : N 3 2 n = N 3 1 n :=
 /-- A387957 is also the case `m = 4`, `r = 3`. -/
 theorem N_four_three (n : ℕ) : N 4 3 n = N 4 1 n :=
   N_eq_of_gcd_eq (by norm_num) (by decide) n
+
+/-! ### Kernel-checked data
+
+The partition numbers `p(0), ..., p(9)` are the coefficients of the finite product
+`prod_{i < 9} 1 / (1 - x^(i+1))` up to `x^9` (`X_pow_dvd_G_one_sub`). The coefficients of that
+product are computed by a structural recursion (`pp`) that the kernel evaluates (`pp_nine`).
+Then `T c n = Tv c n` for `n < 10` (`T_eq_Tv`), where `Tv c` is the `c`-fold convolution power
+of the table of `p`, and the five corollaries give the values of `N`. -/
+
+/-- Convolution of coefficient sequences. -/
+def conv (f g : ℕ → ℕ) (n : ℕ) : ℕ := ∑ k ∈ range (n + 1), f k * g (n - k)
+
+theorem mk_mul_mk (f g : ℕ → ℕ) :
+    PowerSeries.mk (fun n => (f n : ℂ)) * PowerSeries.mk (fun n => (g n : ℂ)) =
+      PowerSeries.mk (fun n => (conv f g n : ℂ)) := by
+  ext n
+  rw [coeff_mul, coeff_mk, Finset.Nat.sum_antidiagonal_eq_sum_range_succ
+    (fun i j => coeff i (PowerSeries.mk (fun n => (f n : ℂ))) *
+      coeff j (PowerSeries.mk (fun n => (g n : ℂ))))]
+  simp [conv]
+
+/-- The `c`-fold convolution power of a coefficient sequence. -/
+def cpow (f : ℕ → ℕ) : ℕ → ℕ → ℕ
+  | 0 => fun n => if n = 0 then 1 else 0
+  | c + 1 => conv f (cpow f c)
+
+theorem mk_cpow (f : ℕ → ℕ) (c : ℕ) :
+    PowerSeries.mk (fun n => (cpow f c n : ℂ)) = PowerSeries.mk (fun n => (f n : ℂ)) ^ c := by
+  induction c with
+  | zero =>
+    ext n
+    simp [cpow, coeff_one]
+  | succ c ih => rw [pow_succ', ← ih, mk_mul_mk]; rfl
+
+/-- The coefficients of the Euler factor `1 / (1 - x^(i+1))`. -/
+def geo (i k : ℕ) : ℕ := if (i + 1) ∣ k then 1 else 0
+
+theorem mk_geo_mul (i : ℕ) :
+    PowerSeries.mk (fun k => (geo i k : ℂ)) * (1 - X ^ (i + 1)) = 1 := by
+  ext n
+  rw [mul_sub, mul_one, map_sub, coeff_mul_X_pow', coeff_mk, coeff_one]
+  rcases Nat.eq_zero_or_pos n with rfl | hn
+  · simp [geo]
+  · simp only [hn.ne', ↓reduceIte]
+    split_ifs with h
+    · rw [coeff_mk]
+      have : (i + 1 ∣ n - (i + 1)) ↔ (i + 1 ∣ n) := by
+        rw [Nat.dvd_sub_self_right]
+        exact ⟨fun h' => h'.elim id fun hle => by rw [le_antisymm hle h], Or.inl⟩
+      simp [geo, this]
+    · have : ¬ (i + 1 ∣ n) := fun hd => h (Nat.le_of_dvd hn hd)
+      simp [geo, this]
+
+theorem eulerFactor_one_eq (i : ℕ) :
+    eulerFactor 1 i = PowerSeries.mk (fun k => (geo i k : ℂ)) := by
+  have h1 := eulerFactor_mul 1 i
+  rw [map_one, one_mul] at h1
+  have h2 := mk_geo_mul i
+  calc eulerFactor 1 i
+      = eulerFactor 1 i * (PowerSeries.mk (fun k => (geo i k : ℂ)) * (1 - X ^ (i + 1))) := by
+        rw [h2, mul_one]
+    _ = (eulerFactor 1 i * (1 - X ^ (i + 1))) * PowerSeries.mk (fun k => (geo i k : ℂ)) := by
+        ring
+    _ = PowerSeries.mk (fun k => (geo i k : ℂ)) := by rw [h1, one_mul]
+
+/-- The coefficients of `prod_{i < K} 1 / (1 - x^(i+1))`. -/
+def pp : ℕ → ℕ → ℕ
+  | 0 => fun n => if n = 0 then 1 else 0
+  | K + 1 => conv (pp K) (geo K)
+
+theorem prod_eulerFactor_eq (K : ℕ) :
+    ∏ i ∈ range K, eulerFactor 1 i = PowerSeries.mk (fun n => (pp K n : ℂ)) := by
+  induction K with
+  | zero =>
+    ext n
+    simp [pp, coeff_one]
+  | succ K ih => rw [prod_range_succ, ih, eulerFactor_one_eq, mk_mul_mk]; rfl
+
+theorem X_pow_dvd_prod_sub_one {N : ℕ} (s : Finset ℕ) (f : ℕ → ℂ⟦X⟧)
+    (h : ∀ i ∈ s, (X : ℂ⟦X⟧) ^ N ∣ f i - 1) : (X : ℂ⟦X⟧) ^ N ∣ (∏ i ∈ s, f i) - 1 := by
+  induction s using Finset.induction_on with
+  | empty => simp
+  | insert a s ha ih =>
+    rw [prod_insert ha]
+    have e : f a * ∏ i ∈ s, f i - 1 = (f a - 1) * ∏ i ∈ s, f i + ((∏ i ∈ s, f i) - 1) := by ring
+    rw [e]
+    exact dvd_add (dvd_mul_of_dvd_left (h a (mem_insert_self a s)) _)
+      (ih fun i hi => h i (mem_insert_of_mem hi))
+
+theorem X_pow_dvd_eulerFactor_sub_one (i : ℕ) :
+    (X : ℂ⟦X⟧) ^ (i + 1) ∣ eulerFactor 1 i - 1 := by
+  have h1 := eulerFactor_mul 1 i
+  rw [map_one, one_mul] at h1
+  refine ⟨eulerFactor 1 i, ?_⟩
+  linear_combination h1
+
+/-- The first `K + 1` coefficients of `G 1` are those of `prod_{i < K} 1 / (1 - x^(i+1))`. -/
+theorem X_pow_dvd_G_one_sub (K : ℕ) :
+    (X : ℂ⟦X⟧) ^ (K + 1) ∣ G 1 - ∏ i ∈ range K, eulerFactor 1 i := by
+  rw [X_pow_dvd_iff]
+  intro m hm
+  rw [map_sub, sub_eq_zero]
+  have ht := ((WithPiTopology.continuous_coeff ℂ m).tendsto _).comp (hasProd_G 1)
+  have hev : (fun s : Finset ℕ => coeff m (∏ i ∈ s, eulerFactor 1 i)) =ᶠ[Filter.atTop]
+      fun _ => coeff m (∏ i ∈ range K, eulerFactor 1 i) := by
+    rw [Filter.EventuallyEq, Filter.eventually_atTop]
+    refine ⟨range K, fun s hs => ?_⟩
+    have hd : (X : ℂ⟦X⟧) ^ (K + 1) ∣
+        ∏ i ∈ s, eulerFactor 1 i - ∏ i ∈ range K, eulerFactor 1 i := by
+      rw [← prod_sdiff hs]
+      have e : (∏ i ∈ s \ range K, eulerFactor 1 i) * ∏ i ∈ range K, eulerFactor 1 i -
+          ∏ i ∈ range K, eulerFactor 1 i =
+          ((∏ i ∈ s \ range K, eulerFactor 1 i) - 1) * ∏ i ∈ range K, eulerFactor 1 i := by ring
+      rw [e]
+      refine dvd_mul_of_dvd_left (X_pow_dvd_prod_sub_one _ _ fun i hi => ?_) _
+      have hi' : K ≤ i := by simpa using (mem_sdiff.mp hi).2
+      exact (pow_dvd_pow X (by omega)).trans (X_pow_dvd_eulerFactor_sub_one i)
+    have := (X_pow_dvd_iff.mp hd) m hm
+    rw [map_sub, sub_eq_zero] at this
+    exact this
+  exact tendsto_nhds_unique ht (tendsto_const_nhds.congr' hev.symm)
+
+/-- The partition numbers `p(0), ..., p(9)`. -/
+def pTable : List ℕ := [1, 1, 2, 3, 5, 7, 11, 15, 22, 30]
+
+/-- The kernel computes the coefficients of `prod_{i < 9} 1 / (1 - x^(i+1))` up to `x^9`. -/
+theorem pp_nine : ∀ n < 10, pp 9 n = pTable.getD n 0 := by decide +kernel
+
+theorem X_pow_dvd_G_one_sub_pTable :
+    (X : ℂ⟦X⟧) ^ 10 ∣ G 1 - PowerSeries.mk (fun n => (pTable.getD n 0 : ℂ)) := by
+  have h := X_pow_dvd_G_one_sub 9
+  rw [prod_eulerFactor_eq] at h
+  rw [X_pow_dvd_iff] at h ⊢
+  intro m hm
+  rw [← h m hm, map_sub, map_sub, coeff_mk, coeff_mk, pp_nine m hm]
+
+/-- `T c n` for `n < 10`, computed from the partition numbers `p(0), ..., p(9)`. -/
+def Tv (c n : ℕ) : ℕ := cpow (fun k => pTable.getD k 0) c n
+
+/-- For `n < 10`, `T c n` is the `c`-fold convolution of `p(0), ..., p(9)`. -/
+theorem T_eq_Tv (c : ℕ) {n : ℕ} (hn : n < 10) : T c n = Tv c n := by
+  have hd := X_pow_dvd_iff.mp
+    (X_pow_dvd_G_one_sub_pTable.trans (sub_dvd_pow_sub_pow _ _ c)) n hn
+  rw [map_sub, sub_eq_zero, coeff_G_one_pow, ← mk_cpow, coeff_mk] at hd
+  exact_mod_cast hd
+
+theorem N_two_one_eq {n : ℕ} (hn : n < 10) :
+    N 2 1 n = (Tv 2 n - if 2 ∣ n then Tv 1 (n / 2) else 0) / 2 := by
+  have h := A392002 n
+  rw [T_eq_Tv 2 hn, T_eq_Tv 1 (by omega : n / 2 < 10)] at h
+  split_ifs at h ⊢ <;> omega
+
+theorem N_three_zero_eq {n : ℕ} (hn : n < 10) :
+    N 3 0 n = (Tv 3 n + 2 * if 3 ∣ n then Tv 1 (n / 3) else 0) / 3 := by
+  have h := A389343 n
+  rw [T_eq_Tv 3 hn, T_eq_Tv 1 (by omega : n / 3 < 10)] at h
+  split_ifs at h ⊢ <;> omega
+
+theorem N_three_one_eq {n : ℕ} (hn : n < 10) :
+    N 3 1 n = (Tv 3 n - if 3 ∣ n then Tv 1 (n / 3) else 0) / 3 := by
+  have h := A390208 n
+  rw [T_eq_Tv 3 hn, T_eq_Tv 1 (by omega : n / 3 < 10)] at h
+  split_ifs at h ⊢ <;> omega
+
+theorem N_four_zero_eq {n : ℕ} (hn : n < 10) :
+    N 4 0 n = (Tv 4 n + (if 2 ∣ n then Tv 2 (n / 2) else 0) +
+      2 * if 4 ∣ n then Tv 1 (n / 4) else 0) / 4 := by
+  have h := A390217 n
+  rw [T_eq_Tv 4 hn, T_eq_Tv 2 (by omega : n / 2 < 10), T_eq_Tv 1 (by omega : n / 4 < 10)] at h
+  split_ifs at h ⊢ <;> omega
+
+theorem N_four_one_eq {n : ℕ} (hn : n < 10) :
+    N 4 1 n = (Tv 4 n - if 2 ∣ n then Tv 2 (n / 2) else 0) / 4 := by
+  have h := A387957 n
+  rw [T_eq_Tv 4 hn, T_eq_Tv 2 (by omega : n / 2 < 10)] at h
+  split_ifs at h ⊢ <;> omega
+
+/-- The first ten terms of A392002, kernel-checked. -/
+theorem A392002_data :
+    (List.range 10).map (N 2 1) = [0, 1, 2, 5, 9, 18, 31, 55, 90, 150] := by
+  rw [List.map_congr_left fun n hn => N_two_one_eq (List.mem_range.mp hn)]
+  decide +kernel
+
+/-- The first ten terms of A389343, kernel-checked. -/
+theorem A389343_data :
+    (List.range 10).map (N 3 0) = [1, 1, 3, 8, 17, 36, 75, 143, 270, 495] := by
+  rw [List.map_congr_left fun n hn => N_three_zero_eq (List.mem_range.mp hn)]
+  decide +kernel
+
+/-- The first ten terms of A390208, kernel-checked. -/
+theorem A390208_data :
+    (List.range 10).map (N 3 1) = [0, 1, 3, 7, 17, 36, 73, 143, 270, 492] := by
+  rw [List.map_congr_left fun n hn => N_three_one_eq (List.mem_range.mp hn)]
+  decide +kernel
+
+/-- The first ten terms of A390217, kernel-checked. -/
+theorem A390217_data :
+    (List.range 10).map (N 4 0) = [1, 1, 4, 10, 28, 63, 146, 310, 651, 1295] := by
+  rw [List.map_congr_left fun n hn => N_four_zero_eq (List.mem_range.mp hn)]
+  decide +kernel
+
+/-- The first ten terms of A387957, kernel-checked. -/
+theorem A387957_data :
+    (List.range 10).map (N 4 1) = [0, 1, 3, 10, 25, 63, 141, 310, 640, 1295] := by
+  rw [List.map_congr_left fun n hn => N_four_one_eq (List.mem_range.mp hn)]
+  decide +kernel
 
 end OeisProofs.ColoredPartitions
