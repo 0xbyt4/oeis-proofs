@@ -80,7 +80,7 @@ theorem split {m p q : ℕ} (hp : 3 ≤ p) (hq : 3 ≤ q) (hp4 : p % 4 = 3) (hq4
     subst ht1
     omega
 
-/-- **Main theorem.** If the triangular number `m (m + 1) / 2` equals `p * q` for distinct
+/-- **The congruence.** If the triangular number `m (m + 1) / 2` equals `p * q` for distinct
 primes `p ≡ q ≡ 3 (mod 4)` and is not `21`, then it is congruent to `1` modulo `36`. -/
 theorem modEq_one {m p q : ℕ} (hp : p.Prime) (hq : q.Prime) (hpq : p ≠ q)
     (hp4 : p % 4 = 3) (hq4 : q % 4 = 3) (hT : m * (m + 1) = 2 * (p * q)) (h21 : p * q ≠ 21) :
