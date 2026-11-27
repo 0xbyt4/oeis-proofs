@@ -13,6 +13,9 @@ Main results:
   positive if `t` is odd and negative if `t` is even and nonzero.
 * `a_pos_iff`: `0 < a n` if and only if `n` is a square.
 * `a_neg_of_not_isSquare`: `a n < 0` if `n` is not a square.
+* `sigma_dvd_a`: `sigma(n)` divides `a n` for `n != 0`.
+* `sigma_mul_alternatingDivisorSum_dvd_a`: if `n` is not a square, `sigma(n) * A071324(n)`
+  divides `a n`, where `alternatingDivisorSum` is A071324.
 
 See `proofs/A306598.md` for the informal proof. The formal proof follows its steps 1 and 2
 (eigenvalues of a circulant matrix, no zero of the generating polynomial on the unit
@@ -270,6 +273,130 @@ theorem det_circulant_neg_of_even {t : ℕ} (ht : Even t) (ht0 : t ≠ 0) (c : F
   rw [hk.neg_one_pow] at h
   linarith
 
+/-! ## Divisibility of circulant determinants
+
+These lemmas hold over any commutative ring. They give the divisibility statements of Remark 1
+in `proofs/A306598.md` without resultants. For `f(1)`, the all-ones vector is an eigenvector and
+we multiply by the adjugate. For `f(1) * f(-1)` in even size, an invertible change of basis that
+keeps the vectors `(1, 0, 1, 0, ...)` and `(0, 1, 0, 1, ...)` makes the circulant matrix block
+triangular, with the `2 x 2` block `[[E, O], [O, E]]`, where `E` and `O` are the sums of the
+even-indexed and the odd-indexed entries. Its determinant is `(E + O) * (E - O) = f(1) * f(-1)`.
+-/
+
+/-- The sum of the entries of the first column of a circulant matrix of nonzero size divides its
+determinant. -/
+theorem sum_dvd_det_circulant {R : Type*} [CommRing R] {t : ℕ} [NeZero t] (c : Fin t → R) :
+    (∑ i, c i) ∣ (circulant c).det := by
+  set v : Fin t → R := fun _ => 1 with hv
+  have hCv : circulant c *ᵥ v = (∑ i, c i) • v := by
+    funext i
+    simp only [mulVec, dotProduct, circulant_apply, hv, mul_one, Pi.smul_apply, smul_eq_mul]
+    exact Equiv.sum_comp (Equiv.subLeft i) c
+  have h := congrArg (fun w => (adjugate (circulant c) *ᵥ w) 0) hCv
+  simp only [mulVec_mulVec, adjugate_mul, mulVec_smul, smul_mulVec, one_mulVec,
+    Pi.smul_apply, smul_eq_mul, hv, mul_one] at h
+  exact ⟨_, h⟩
+
+/-- If the first columns (indexed by `κ`) of `C * P` are the combinations of the same columns of
+`P` given by `M`, and `P` is invertible, then `det M` divides `det C`. -/
+theorem det_dvd_det_of_mul_eq {R : Type*} [CommRing R] {κ ι : Type*} [Fintype κ]
+    [DecidableEq κ] [Fintype ι] [DecidableEq ι] (C P : Matrix (κ ⊕ ι) (κ ⊕ ι) R)
+    (M : Matrix κ κ R) (hP : IsUnit P.det)
+    (h : ∀ x a, (C * P) x (Sum.inl a) = ∑ b, P x (Sum.inl b) * M b a) : M.det ∣ C.det := by
+  set B := P⁻¹ * (C * P) with hB
+  have hdet : B.det = C.det := by
+    rw [hB, det_mul, det_mul]
+    calc P⁻¹.det * (C.det * P.det) = (P⁻¹.det * P.det) * C.det := by ring
+      _ = C.det := by rw [det_nonsing_inv_mul_det P hP, one_mul]
+  have hcol : ∀ x a,
+      B x (Sum.inl a) = ∑ b, (1 : Matrix (κ ⊕ ι) (κ ⊕ ι) R) x (Sum.inl b) * M b a := by
+    intro x a
+    rw [← nonsing_inv_mul P hP]
+    simp only [hB, Matrix.mul_apply, h, Finset.mul_sum, Finset.sum_mul]
+    rw [Finset.sum_comm]
+    exact Finset.sum_congr rfl fun b _ => Finset.sum_congr rfl fun y _ => by ring
+  have h11 : B.toBlocks₁₁ = M := by
+    ext i j
+    simp only [toBlocks₁₁, of_apply, hcol]
+    rw [Finset.sum_eq_single i
+      (fun b _ hb => by rw [one_apply_ne (by simpa using hb.symm), zero_mul]) (by simp),
+      one_apply_eq, one_mul]
+  have h21 : B.toBlocks₂₁ = 0 := by
+    ext i j
+    simp [toBlocks₂₁, hcol]
+  rw [← hdet, ← fromBlocks_toBlocks B, h11, h21, det_fromBlocks_zero₂₁]
+  exact dvd_mul_right _ _
+
+/-- For a circulant matrix of even nonzero size, `f(1) * f(-1)` divides the determinant, where
+`f(x) = sum_k c_k x^k`. -/
+theorem sum_mul_alternating_sum_dvd_det_circulant {R : Type*} [CommRing R] {t : ℕ} (ht : Even t)
+    (ht0 : t ≠ 0) (c : Fin t → R) :
+    (∑ i, c i) * (∑ i : Fin t, (-1) ^ (i : ℕ) * c i) ∣ (circulant c).det := by
+  obtain ⟨m, rfl⟩ : ∃ m, t = 2 + m := ⟨t - 2, by obtain ⟨u, hu⟩ := ht; omega⟩
+  have h2 : 2 ∣ 2 + m := even_iff_two_dvd.mp ht
+  set e : Fin 2 ⊕ Fin m ≃ Fin (2 + m) := finSumFinEquiv with he
+  set C := reindex e.symm e.symm (circulant c) with hC
+  set M : Matrix (Fin 2) (Fin 2) R :=
+    of fun b a => ∑ k : Fin (2 + m), if ((b : ℕ) + k) % 2 = a then c k else 0 with hM
+  set P : Matrix (Fin 2 ⊕ Fin m) (Fin 2 ⊕ Fin m) R :=
+    fromBlocks 1 0 (of fun j a => if (e (Sum.inr j) : ℕ) % 2 = a then 1 else 0) 1 with hP
+  have hPcol : ∀ x b, P x (Sum.inl b) = if (e x : ℕ) % 2 = b then 1 else 0 := by
+    rintro (i | j) b
+    · simp only [hP, fromBlocks_apply₁₁, Matrix.one_apply, he, finSumFinEquiv_apply_left,
+        Fin.val_castAdd, Nat.mod_eq_of_lt i.2, Fin.ext_iff]
+    · simp [hP]
+  have hPdet : P.det = 1 := by simp [hP]
+  have hpar : ∀ i k : Fin (2 + m), ((i - k : Fin (2 + m)) : ℕ) % 2 = ((i : ℕ) + k) % 2 := by
+    intro i k
+    rw [Fin.val_sub, Nat.mod_mod_of_dvd _ h2]
+    have := k.2
+    omega
+  have hrel : ∀ x a, (C * P) x (Sum.inl a) = ∑ b, P x (Sum.inl b) * M b a := by
+    intro x a
+    simp only [Matrix.mul_apply, hC, reindex_apply, submatrix_apply, Equiv.symm_symm,
+      circulant_apply, hPcol]
+    rw [Equiv.sum_comp e (fun z => c (e x - z) * if (z : ℕ) % 2 = a then 1 else 0),
+      ← Equiv.sum_comp (Equiv.subLeft (e x))]
+    simp only [Equiv.subLeft_apply, sub_sub_cancel, hpar, Fin.sum_univ_two, hM, of_apply,
+      mul_ite, mul_one, mul_zero, ite_mul, one_mul, zero_mul, Fin.val_zero, Fin.val_one]
+    rcases Nat.mod_two_eq_zero_or_one (e x : ℕ) with h | h
+    · simp only [h, ite_true, show ¬ (0 = 1) from by omega, ite_false, add_zero]
+      exact Finset.sum_congr rfl fun k _ => if_congr (by omega) rfl rfl
+    · simp only [h, ite_true, show ¬ (1 = 0) from by omega, ite_false, zero_add]
+      exact Finset.sum_congr rfl fun k _ => if_congr (by omega) rfl rfl
+  have hdvd := det_dvd_det_of_mul_eq C P M (by rw [hPdet]; exact isUnit_one) hrel
+  rw [hC, det_reindex_self] at hdvd
+  set E : R := ∑ k : Fin (2 + m), if (k : ℕ) % 2 = 0 then c k else 0 with hE
+  set O : R := ∑ k : Fin (2 + m), if (k : ℕ) % 2 = 1 then c k else 0 with hO
+  have hM00 : M 0 0 = E := by
+    simp only [hM, of_apply, hE, Fin.val_zero, zero_add]
+  have hM11 : M 1 1 = E := by
+    simp only [hM, of_apply, hE]
+    exact Finset.sum_congr rfl fun k _ => if_congr (by simp only [Fin.val_one]; omega) rfl rfl
+  have hM01 : M 0 1 = O := by
+    simp only [hM, of_apply, hO]
+    exact Finset.sum_congr rfl fun k _ =>
+      if_congr (by simp only [Fin.val_one, Fin.val_zero]; omega) rfl rfl
+  have hM10 : M 1 0 = O := by
+    simp only [hM, of_apply, hO]
+    exact Finset.sum_congr rfl fun k _ =>
+      if_congr (by simp only [Fin.val_one, Fin.val_zero]; omega) rfl rfl
+  have hs : ∑ i, c i = E + O := by
+    rw [hE, hO, ← Finset.sum_add_distrib]
+    refine Finset.sum_congr rfl fun k _ => ?_
+    rcases Nat.mod_two_eq_zero_or_one (k : ℕ) with h | h <;> simp [h]
+  have ha : ∑ i : Fin (2 + m), (-1) ^ (i : ℕ) * c i = E - O := by
+    rw [hE, hO, ← Finset.sum_sub_distrib]
+    refine Finset.sum_congr rfl fun k _ => ?_
+    rcases Nat.mod_two_eq_zero_or_one (k : ℕ) with h | h
+    · simp [h, (Nat.even_iff.mpr h).neg_one_pow]
+    · simp [h, (Nat.odd_iff.mpr h).neg_one_pow]
+  rw [det_fin_two, hM00, hM11, hM01, hM10] at hdvd
+  rw [hs, ha]
+  convert hdvd using 1
+  ring
+
+
 /-! ## The number of divisors -/
 
 theorem odd_prod_iff {S : Type*} (s : Finset S) (f : S → ℕ) :
@@ -410,6 +537,62 @@ example : a 7 = -48 := by
 
 example : a 8 = -3375 := by
   rw [a_eq_of_divisorList (l := [1, 2, 4, 8]) (divisorList_eq (by decide) (by decide))]
+  decide
+
+/-! ## The divisibility statements of Remark 1 -/
+
+/-- OEIS A071324: the alternating sum of the divisors of `n`, starting with the largest one,
+`d_t - d_(t-1) + d_(t-2) - ...`. -/
+def alternatingDivisorSum (n : ℕ) : ℤ :=
+  ((divisorList n).reverse.map fun d : ℕ => (d : ℤ)).alternatingSum
+
+theorem sum_divisorList (n : ℕ) :
+    ∑ i : Fin (divisorList n).length, ((divisorList n)[i] : ℤ) =
+      (ArithmeticFunction.sigma 1 n : ℤ) := by
+  rw [ArithmeticFunction.sigma_one_apply, Nat.cast_sum, ← List.sum_ofFn]
+  simp only [Fin.getElem_fin]
+  rw [List.ofFn_getElem_eq_map (divisorList n) (fun d : ℕ => (d : ℤ)),
+    Finset.sum_eq_multiset_sum, ← Multiset.sum_coe, ← Multiset.map_coe, divisorList,
+    Finset.sort_eq]
+
+theorem alternatingDivisorSum_eq {n : ℕ} (h : Even (divisorList n).length) :
+    alternatingDivisorSum n =
+      -∑ i : Fin (divisorList n).length, (-1) ^ (i : ℕ) * ((divisorList n)[i] : ℤ) := by
+  have hl : ((divisorList n).map fun d : ℕ => (d : ℤ)).length = (divisorList n).length :=
+    List.length_map _
+  rw [alternatingDivisorSum, List.map_reverse, List.alternatingSum_reverse,
+    List.alternatingSum_eq_finsetSum,
+    show (-1 : ℤ) ^ (((divisorList n).map fun d : ℕ => (d : ℤ)).length + 1) = -1 by
+      rw [hl]; exact h.add_one.neg_one_pow,
+    neg_one_zsmul, ← Fin.sum_congr' _ hl]
+  congr 1
+  exact Finset.sum_congr rfl fun i _ => by simp
+
+/-- **Remark 1, first part.** `sigma(n)` divides `a(n)` for `n >= 1`. -/
+theorem sigma_dvd_a {n : ℕ} (hn : n ≠ 0) : (ArithmeticFunction.sigma 1 n : ℤ) ∣ a n := by
+  have : NeZero (divisorList n).length := ⟨by rw [length_divisorList]; simpa using hn⟩
+  rw [← sum_divisorList]
+  exact sum_dvd_det_circulant _
+
+/-- **Remark 1, second part.** If `n` is not a square, `sigma(n) * A071324(n)` divides `a(n)`. -/
+theorem sigma_mul_alternatingDivisorSum_dvd_a {n : ℕ} (h : ¬IsSquare n) :
+    (ArithmeticFunction.sigma 1 n : ℤ) * alternatingDivisorSum n ∣ a n := by
+  have hn : n ≠ 0 := by
+    rintro rfl
+    exact h ⟨0, rfl⟩
+  have heven : Even (divisorList n).length := by
+    rw [length_divisorList, ← Nat.not_odd_iff_even, odd_card_divisors_iff hn]; exact h
+  have hne : (divisorList n).length ≠ 0 := by
+    rw [length_divisorList]; simpa using hn
+  rw [← sum_divisorList, alternatingDivisorSum_eq heven, mul_neg, neg_dvd]
+  exact sum_mul_alternating_sum_dvd_det_circulant heven hne _
+
+example : alternatingDivisorSum 6 = 4 := by
+  rw [alternatingDivisorSum, divisorList_eq (l := [1, 2, 3, 6]) (by decide) (by decide)]
+  decide
+
+example : alternatingDivisorSum 8 = 5 := by
+  rw [alternatingDivisorSum, divisorList_eq (l := [1, 2, 4, 8]) (by decide) (by decide)]
   decide
 
 end OeisProofs.A306598
