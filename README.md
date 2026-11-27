@@ -47,19 +47,20 @@ For every statement we do these steps:
 
 ## Formalization scope
 
-Every Lean file proves the statement that the OEIS marks as a conjecture.
-Some additional claims of the written proofs are not formalized. Each proof
-file gives the details in its "Formalization" section.
+Every Lean file proves the statement that the OEIS marks as a conjecture,
+and the additional claims of the written proof. The table lists the
+remaining differences. Each proof file gives the details in its
+"Formalization" section.
 
 | Result | Proved in Lean | Proved on paper only | Lean check against OEIS data |
 | --- | --- | --- | --- |
-| A306598 | The sign rule, and the general theorem for strictly increasing positive sequences | The divisibility remarks | First 8 terms, kernel-checked |
+| A306598 | The sign rule, the general theorem for strictly increasing positive sequences, and both divisibility remarks | None | First 8 terms, kernel-checked |
 | A343752 | The equivalence and the closed form | None | First 16 terms, kernel-checked |
 | A372966 | Divisibility, the congruence modulo 240, and a(2) = 241 | None | Uses Mathlib's `sigma` |
-| A365849 | The congruence modulo 36 | The characterization of the terms and the optimality of 36 | None; the Lean file does not define the sequence |
-| A352446, A341309, A352269 | Statements 1 and 2, with Statement 1 in coefficient form | Statements 3 and 4, and the power-series form of Statement 1 | First 12 terms of A352446 and A341309, kernel-checked |
+| A365849 | The characterization of the terms, the congruence modulo 36, and the optimality of 36 | None | The terms 21, 253, 1081 and 13861 are proved to be terms; 21 is proved to be the least |
+| A352446, A341309, A352269 | All four statements. Statement 1 is proved for the coefficients of the partial sums of the series | The infinite sum of the series as one object; A204217 is used in coefficient form | First 12 terms of A352446 and A341309, kernel-checked |
 | A292042, A292043 | Both series formulas, in coefficient form | None | First 20 and 16 terms, kernel-checked |
-| Colored partitions | The general theorem, as integer and as power-series identity, and the five corollaries | None | Compiled evaluation only, not kernel-checked |
+| Colored partitions | The general theorem, as integer and as power-series identity, and the five corollaries | None | First 10 terms of each of the five sequences, kernel-checked |
 
 All theorems depend only on the standard axioms `propext`, `Classical.choice`
 and `Quot.sound`. The Lean files contain no `sorry` and no `native_decide`.
@@ -117,6 +118,7 @@ pre-commit install
 | 2026-11-27 | Automated prior-work search for each result (OEIS entries and history, arXiv, MathOverflow, journals) | No published proof found; classical sources added to each proof file |
 | 2026-11-27 | Automated comparison of each Lean statement with the written theorem and the OEIS wording | Main statements match; gaps recorded under "Formalization scope" |
 | 2026-11-27 | `lake build`, axiom audit of all theorems, and all scripts in `verify/` | All pass |
+| 2026-11-27 | Formalization of the claims that were proved on paper only | Done for A306598, A365849, A352446 and the colored partitions data |
 
 ## How to cite
 
