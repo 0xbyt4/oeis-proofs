@@ -17,7 +17,9 @@ See `proofs/A292042.md` for the informal proof.
 
 ## How the statement is formalized
 
-No infinite product and no infinite sum is used.
+The main statements are first proved coefficient by coefficient, with finite
+truncations, and then restated with `HasProd` and `HasSum` in the product
+topology on power series (`PowerSeries.WithPiTopology`).
 
 * The coefficient of `x^m` in `P` only depends on the factors with `k <= m`.
   The sequences are defined through the truncated product `P m`, and
@@ -33,6 +35,13 @@ No infinite product and no infinite sum is used.
 * `two_mul_a_int` and `two_mul_b_int` are the same statements
   over `ℤ`, with the explicit inverse `invQ n` of `(1-x)...(1-x^n)`
   (see `invQ_mul_prod`).
+* `hasProd_one_sub_I_smul_X_pow` states, in `ℂ⟦X⟧`, that the infinite
+  product `prod_{k >= 1} (1 - i x^k)` converges to
+  `sum_m (a m + b m i) x^m`.
+* `hasSum_two_mul_a` and `hasSum_two_mul_b` state, in `ℚ⟦X⟧`, that the
+  infinite series on the right converge to `sum_m 2 (a m) x^m` and
+  `sum_m 2 (b m) x^m`. They follow from `two_mul_a` and `two_mul_b`, because
+  the summands with `n >= m + 2` have no coefficient of `x^m`.
 
 ## Proof
 
@@ -477,6 +486,113 @@ theorem two_mul_b_of_le {m L : ℕ} (hL : m + 2 ≤ L) :
         (-1 : ℚ⟦X⟧) ^ (n * (n + 1) / 2) * X ^ (n * (n - 1) / 2) *
           (∏ k ∈ Finset.Icc 1 n, (1 - X ^ k))⁻¹) := by
   rw [coeff_sum_range_of_le (fun n => n * (n + 1) / 2) hL, two_mul_b]
+
+/-! ### The infinite product and the infinite series -/
+
+section InfiniteForm
+
+open scoped PowerSeries.WithPiTopology
+
+/-- The factors `1 - c x^(i+1)` with `i >= m` are `1` modulo `x^(m+1)`. -/
+theorem X_pow_dvd_prod_one_sub_sub_one {R : Type*} [CommRing R] (c : R) {m : ℕ}
+    (t : Finset ℕ) (ht : ∀ i ∈ t, m ≤ i) :
+    (X : R⟦X⟧) ^ (m + 1) ∣ (∏ i ∈ t, (1 - c • (X : R⟦X⟧) ^ (i + 1))) - 1 := by
+  induction t using Finset.induction_on with
+  | empty => simp
+  | insert j t hj ih =>
+    rw [prod_insert hj]
+    have hjm : m ≤ j := ht j (mem_insert_self j t)
+    have e : (1 - c • (X : R⟦X⟧) ^ (j + 1)) * ∏ i ∈ t, (1 - c • (X : R⟦X⟧) ^ (i + 1)) - 1 =
+        ((∏ i ∈ t, (1 - c • (X : R⟦X⟧) ^ (i + 1))) - 1) -
+          X ^ (j + 1) * (c • ∏ i ∈ t, (1 - c • (X : R⟦X⟧) ^ (i + 1))) := by
+      rw [smul_eq_C_mul, smul_eq_C_mul]; ring
+    rw [e]
+    exact dvd_sub (ih fun i hi => ht i (mem_insert_of_mem hi))
+      (dvd_mul_of_dvd_left (pow_dvd_pow _ (by omega)) _)
+
+/-- The coefficient of `x^m` of a finite product of factors `1 - c x^(i+1)` only
+depends on the factors with `i < m`. -/
+theorem coeff_prod_one_sub_of_subset {R : Type*} [CommRing R] (c : R) {m : ℕ}
+    {s : Finset ℕ} (hs : range m ⊆ s) :
+    coeff m (∏ i ∈ s, (1 - c • (X : R⟦X⟧) ^ (i + 1))) =
+      coeff m (∏ i ∈ range m, (1 - c • (X : R⟦X⟧) ^ (i + 1))) := by
+  obtain ⟨w, hw⟩ := X_pow_dvd_prod_one_sub_sub_one c (s \ range m) fun i hi => by
+    simpa using (mem_sdiff.1 hi).2
+  rw [← prod_sdiff hs, eq_add_of_sub_eq hw, add_mul, one_mul, mul_assoc, map_add,
+    coeff_X_pow_mul', ite_eq_right (by omega), zero_add]
+
+/-- `coeff m (P m)`, mapped to `ℂ`, is the coefficient of `x^m` of
+`prod_{i < m} (1 - i x^(i+1))` over `ℂ`. -/
+theorem coeff_P_eq_coeff_prod_range (m : ℕ) :
+    ((coeff m (P m) : GaussianInt) : ℂ) =
+      coeff m (∏ i ∈ range m, (1 - Complex.I • (X : ℂ⟦X⟧) ^ (i + 1))) := by
+  rw [← coeff_map, P, map_prod, prod_range_shift (fun k => 1 - Complex.I • (X : ℂ⟦X⟧) ^ k)]
+  congr 1
+  refine prod_congr rfl fun k _ => ?_
+  rw [smul_eq_C_mul]
+  simp [GaussianInt.toComplex_def']
+
+/-- **The infinite product.** In `ℂ⟦X⟧` with the product topology, the infinite
+product `prod_{k >= 1} (1 - i x^k)` converges to `sum_m (a m + b m i) x^m`.
+So `A(x) = sum_m a m x^m` and `B(x) = sum_m b m x^m` are the real and imaginary
+parts of `(ix; x)_infinity`. -/
+theorem hasProd_one_sub_I_smul_X_pow :
+    HasProd (fun k : ℕ => (1 - Complex.I • (X : ℂ⟦X⟧) ^ (k + 1)))
+      (PowerSeries.mk fun m => (a m : ℂ) + (b m : ℂ) * Complex.I) := by
+  rw [HasProd, WithPiTopology.tendsto_iff_coeff_tendsto]
+  intro m
+  refine tendsto_const_nhds.congr' ?_
+  rw [Filter.EventuallyEq, SummationFilter.unconditional_filter, Filter.eventually_atTop]
+  refine ⟨range m, fun s hs => ?_⟩
+  rw [coeff_prod_one_sub_of_subset _ hs, ← coeff_P_eq_coeff_prod_range, coeff_mk,
+    GaussianInt.toComplex_def, a, b]
+
+/-- From the coefficient formulas to `HasSum`: if `2 * c m` is the coefficient of
+`x^m` of the partial sum over `n < m + 2`, then the whole series sums to
+`sum_m 2 (c m) x^m`. -/
+theorem hasSum_of_two_mul {e : ℕ → ℕ} {c : ℕ → ℤ}
+    (h : ∀ m, (2 * c m : ℚ) =
+      coeff m (∑ n ∈ Finset.range (m + 2),
+        (-1 : ℚ⟦X⟧) ^ e n * X ^ (n * (n - 1) / 2) *
+          (∏ k ∈ Finset.Icc 1 n, (1 - X ^ k))⁻¹)) :
+    HasSum (fun n => ((-1) ^ e n : ℚ) • (X : ℚ⟦X⟧) ^ (n * (n - 1) / 2) *
+        (∏ k ∈ Finset.Icc 1 n, (1 - X ^ k))⁻¹)
+      (PowerSeries.mk fun m => (2 * c m : ℚ)) := by
+  have hf : ∀ n, ((-1) ^ e n : ℚ) • (X : ℚ⟦X⟧) ^ (n * (n - 1) / 2) *
+      (∏ k ∈ Finset.Icc 1 n, (1 - X ^ k))⁻¹ =
+      (-1 : ℚ⟦X⟧) ^ e n * X ^ (n * (n - 1) / 2) *
+        (∏ k ∈ Finset.Icc 1 n, (1 - X ^ k))⁻¹ := by
+    intro n
+    rw [smul_eq_C_mul, map_pow, map_neg, map_one]
+  simp_rw [hf]
+  rw [WithPiTopology.hasSum_iff_hasSum_coeff]
+  intro m
+  rw [coeff_mk, h m, map_sum]
+  refine hasSum_sum_of_ne_finset_zero fun n hn => ?_
+  have hn' : m + 2 ≤ n := by simpa using hn
+  rw [mul_assoc, mul_left_comm, coeff_triangle_mul_eq_zero hn']
+
+/-- **OEIS conjecture for A292042, as a series identity.** In `ℚ⟦X⟧` with the
+product topology,
+`sum_{n >= 0} (-1)^(n(n-1)/2) x^(n(n-1)/2) / ((1 - x)...(1 - x^n))`
+converges to `2 A(x) = sum_m 2 (a m) x^m`. -/
+theorem hasSum_two_mul_a :
+    HasSum (fun n => ((-1) ^ (n * (n - 1) / 2) : ℚ) • (X : ℚ⟦X⟧) ^ (n * (n - 1) / 2) *
+        (∏ k ∈ Finset.Icc 1 n, (1 - X ^ k))⁻¹)
+      (PowerSeries.mk fun m => (2 * a m : ℚ)) :=
+  hasSum_of_two_mul two_mul_a
+
+/-- **Companion formula for A292043, as a series identity.** In `ℚ⟦X⟧` with the
+product topology,
+`sum_{n >= 0} (-1)^(n(n+1)/2) x^(n(n-1)/2) / ((1 - x)...(1 - x^n))`
+converges to `2 B(x) = sum_m 2 (b m) x^m`. -/
+theorem hasSum_two_mul_b :
+    HasSum (fun n => ((-1) ^ (n * (n + 1) / 2) : ℚ) • (X : ℚ⟦X⟧) ^ (n * (n - 1) / 2) *
+        (∏ k ∈ Finset.Icc 1 n, (1 - X ^ k))⁻¹)
+      (PowerSeries.mk fun m => (2 * b m : ℚ)) :=
+  hasSum_of_two_mul two_mul_b
+
+end InfiniteForm
 
 /-! ### Sanity check against the OEIS data -/
 
